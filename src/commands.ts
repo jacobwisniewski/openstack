@@ -11,6 +11,9 @@ export interface FileSystem {
   copyFileSync: typeof fs.copyFileSync;
   readdirSync: typeof fs.readdirSync;
   rmSync: typeof fs.rmSync;
+  symlinkSync: typeof fs.symlinkSync;
+  unlinkSync: typeof fs.unlinkSync;
+  lstatSync: typeof fs.lstatSync;
 }
 
 export interface OpenStackConfig {
@@ -47,6 +50,22 @@ export interface InitError {
 }
 
 export type InitOutput = InitResult | InitError;
+
+export interface UseOptions {
+  name: string;
+}
+
+export interface UseResult {
+  success: true;
+  message: string;
+}
+
+export interface UseError {
+  success: false;
+  error: string;
+}
+
+export type UseOutput = UseResult | UseError;
 
 export function isInitialized(paths: Paths, fs: FileSystem): boolean {
   return fs.existsSync(paths.configFile);
@@ -106,12 +125,10 @@ export function init(
   options: InitOptions,
   packageVersion: string,
 ): InitOutput {
-  // Check if opencode exists
   if (!fs.existsSync(path.join(paths.opencodeDir, "AGENTS.md"))) {
     return { success: false, error: "OpenCode config not found" };
   }
 
-  // Check if already initialized
   if (isInitialized(paths, fs) && !options.force) {
     return {
       success: false,
@@ -120,7 +137,6 @@ export function init(
     };
   }
 
-  // Create directories
   if (!fs.existsSync(paths.openstackDir)) {
     fs.mkdirSync(paths.openstackDir, { recursive: true });
   }
@@ -128,7 +144,6 @@ export function init(
     fs.mkdirSync(paths.profilesDir, { recursive: true });
   }
 
-  // Backup current config to profiles/default/
   const defaultProfileDir = path.join(paths.profilesDir, "default");
 
   if (fs.existsSync(defaultProfileDir) && options.force) {
@@ -137,12 +152,10 @@ export function init(
 
   copyDir(fs, paths.opencodeDir, defaultProfileDir);
 
-  // Verify backup
   if (!fs.existsSync(path.join(defaultProfileDir, "AGENTS.md"))) {
     return { success: false, error: "Backup failed: AGENTS.md not found in backup." };
   }
 
-  // Create config
   const config: OpenStackConfig = {
     version: packageVersion,
     active_profile: "default",
@@ -170,6 +183,68 @@ export function init(
   };
 }
 
+export function use(
+  paths: Paths,
+  fs: FileSystem,
+  options: UseOptions,
+): UseOutput {
+  const config = loadConfig(paths, fs);
+  if (!config) {
+    return { success: false, error: "Failed to load config" };
+  }
+
+  const profile = config.profiles.find((p) => p.name === options.name);
+  if (!profile) {
+    return {
+      success: false,
+      error: `Profile "${options.name}" not found. Run "openstack list" to see available profiles.`,
+    };
+  }
+
+  const profileDir = path.join(paths.profilesDir, options.name);
+  if (!fs.existsSync(profileDir)) {
+    return {
+      success: false,
+      error: `Profile "${options.name}" directory not found at ${profileDir}`,
+    };
+  }
+
+  // Remove existing symlinks in opencode dir
+  if (fs.existsSync(paths.opencodeDir)) {
+    const entries = fs.readdirSync(paths.opencodeDir, { withFileTypes: true });
+    for (const entry of entries) {
+      const entryPath = path.join(paths.opencodeDir, entry.name);
+      try {
+        const stats = fs.lstatSync(entryPath);
+        if (stats.isSymbolicLink()) {
+          fs.unlinkSync(entryPath);
+        }
+      } catch {
+        // Ignore errors for non-symlinks
+      }
+    }
+  } else {
+    fs.mkdirSync(paths.opencodeDir, { recursive: true });
+  }
+
+  // Create new symlinks
+  const entries = fs.readdirSync(profileDir, { withFileTypes: true });
+  for (const entry of entries) {
+    const srcPath = path.join(profileDir, entry.name);
+    const destPath = path.join(paths.opencodeDir, entry.name);
+    fs.symlinkSync(srcPath, destPath);
+  }
+
+  // Update config
+  config.active_profile = options.name;
+  saveConfig(paths, fs, config);
+
+  return {
+    success: true,
+    message: `Switched to profile "${options.name}"`,
+  };
+}
+
 export interface ProfileListItem {
   name: string;
   source: string;
@@ -190,9 +265,5 @@ export function list(paths: Paths, fs: FileSystem): ProfileListItem[] | null {
 }
 
 export function install(_source: string, _name?: string): string {
-  return "Not yet implemented";
-}
-
-export function use(_name: string): string {
   return "Not yet implemented";
 }

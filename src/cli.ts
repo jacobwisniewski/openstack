@@ -26,6 +26,9 @@ const fileSystem: FileSystem = {
   copyFileSync: fs.copyFileSync,
   readdirSync: fs.readdirSync,
   rmSync: fs.rmSync,
+  symlinkSync: fs.symlinkSync,
+  unlinkSync: fs.unlinkSync,
+  lstatSync: fs.lstatSync,
 };
 
 function handleError(message: string): never {
@@ -65,8 +68,13 @@ program
   .command("use <name>")
   .description("Switch to a profile")
   .action((name) => {
-    const message = use(name);
-    console.log(message);
+    const paths = createPaths();
+    const result = use(paths, fileSystem, { name });
+
+    if (!result.success) {
+      handleError(result.error);
+    }
+    console.log(result.message);
   });
 
 program

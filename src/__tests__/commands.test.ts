@@ -23,6 +23,9 @@ function createRealFileSystem(): FileSystem {
     copyFileSync: fs.copyFileSync,
     readdirSync: fs.readdirSync,
     rmSync: fs.rmSync,
+    symlinkSync: fs.symlinkSync,
+    unlinkSync: fs.unlinkSync,
+    lstatSync: fs.lstatSync,
   };
 }
 
