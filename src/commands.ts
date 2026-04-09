@@ -13,6 +13,10 @@ export interface FileSystem {
   rmSync: typeof fs.rmSync;
 }
 
+export interface GitRunner {
+  clone: (url: string, dest: string) => void;
+}
+
 export interface OpenStackConfig {
   version: string;
   active_profile: string;
@@ -47,6 +51,22 @@ export interface InitError {
 }
 
 export type InitOutput = InitResult | InitError;
+
+export interface InstallOptions {
+  name?: string;
+}
+
+export interface InstallResult {
+  success: true;
+  message: string;
+}
+
+export interface InstallError {
+  success: false;
+  error: string;
+}
+
+export type InstallOutput = InstallResult | InstallError;
 
 export function isInitialized(paths: Paths, fs: FileSystem): boolean {
   return fs.existsSync(paths.configFile);
@@ -243,8 +263,14 @@ export function remove(
   };
 }
 
-export function install(_source: string, _name?: string): string {
-  return "Not yet implemented";
+export function install(
+  _paths: Paths,
+  _fs: FileSystem,
+  _git: GitRunner,
+  _source: string,
+  _options: { name?: string },
+): InstallOutput {
+  return { success: false, error: "Not yet implemented" };
 }
 
 export function use(_name: string): string {
