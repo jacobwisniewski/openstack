@@ -20,6 +20,22 @@ export interface GitRunner {
   clone: (url: string, dest: string) => void;
 }
 
+function generateProfileName(source: string): string {
+  let clean = source.replace(/^(git@|https?:\/\/)/, "").replace(/\.git$/, "");
+  
+  if (clean.includes(":")) {
+    clean = clean.split(":")[1];
+  }
+  
+  const parts = clean.split("/").filter((p) => p.length > 0);
+  
+  if (parts.length >= 2) {
+    return parts.slice(-2).join("-");
+  }
+  
+  return parts.join("-") || "unknown";
+}
+
 export interface OpenStackConfig {
   version: string;
   active_profile: string;
@@ -279,7 +295,7 @@ export function install(
   }
 
   // Determine profile name from source or options
-  const profileName = options.name ?? source.split("/").pop()?.replace(/\.git$/, "") ?? "unknown";
+  const profileName = options.name ?? generateProfileName(source);
   const profileDir = path.join(paths.profilesDir, profileName);
 
   if (fs.existsSync(profileDir)) {
