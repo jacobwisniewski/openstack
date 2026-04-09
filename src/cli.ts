@@ -4,7 +4,7 @@ import * as path from "path";
 import * as os from "os";
 import { execSync } from "child_process";
 import { program } from "commander";
-import { init, list, install, use, type Paths, type FileSystem, type GitRunner } from "./commands";
+import { init, list, install, use, remove, type Paths, type FileSystem, type GitRunner } from "./commands";
 
 const PACKAGE_JSON_PATH = path.join(__dirname, "..", "package.json");
 const PACKAGE_VERSION = JSON.parse(fs.readFileSync(PACKAGE_JSON_PATH, "utf-8")).version;
@@ -88,6 +88,20 @@ program
   .action((name) => {
     const paths = createPaths();
     const result = use(paths, fileSystem, { name });
+
+    if (!result.success) {
+      handleError(result.error);
+    }
+    console.log(result.message);
+  });
+
+program
+  .command("remove <name>")
+  .description("Remove an installed profile")
+  .option("-f, --force", "Force removal even if profile is active")
+  .action((name, options) => {
+    const paths = createPaths();
+    const result = remove(paths, fileSystem, { name, force: options.force });
 
     if (!result.success) {
       handleError(result.error);

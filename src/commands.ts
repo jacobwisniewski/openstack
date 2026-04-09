@@ -11,9 +11,6 @@ export interface FileSystem {
   copyFileSync: typeof fs.copyFileSync;
   readdirSync: typeof fs.readdirSync;
   rmSync: typeof fs.rmSync;
-  symlinkSync: typeof fs.symlinkSync;
-  unlinkSync: typeof fs.unlinkSync;
-  lstatSync: typeof fs.lstatSync;
 }
 
 export interface GitRunner {
@@ -71,22 +68,6 @@ export interface InstallError {
 
 export type InstallOutput = InstallResult | InstallError;
 
-export interface UseOptions {
-  name: string;
-}
-
-export interface UseResult {
-  success: true;
-  message: string;
-}
-
-export interface UseError {
-  success: false;
-  error: string;
-}
-
-export type UseOutput = UseResult | UseError;
-
 export function isInitialized(paths: Paths, fs: FileSystem): boolean {
   return fs.existsSync(paths.configFile);
 }
@@ -137,19 +118,6 @@ export function copyDir(fs: FileSystem, src: string, dest: string): void {
       fs.copyFileSync(srcPath, destPath);
     }
   }
-}
-
-export function extractProfileName(url: string, customName?: string): string {
-  if (customName) {
-    return customName;
-  }
-
-  const match = url.match(/\/([^/]+?)(?:\.git)?$/);
-  if (match) {
-    return match[1];
-  }
-
-  throw new Error("Could not extract profile name from URL");
 }
 
 export function init(
@@ -212,114 +180,6 @@ export function init(
   };
 }
 
-export function install(
-  paths: Paths,
-  fs: FileSystem,
-  git: GitRunner,
-  source: string,
-  options: InstallOptions,
-): InstallOutput {
-  const profileName = extractProfileName(source, options.name);
-  const profileDir = path.join(paths.profilesDir, profileName);
-
-  if (fs.existsSync(profileDir)) {
-    return {
-      success: false,
-      error: `Profile "${profileName}" already exists. Remove it first or use a different name.`,
-    };
-  }
-
-  try {
-    git.clone(source, profileDir);
-  } catch {
-    return {
-      success: false,
-      error: `Failed to clone from ${source}`,
-    };
-  }
-
-  const config = loadConfig(paths, fs);
-  if (!config) {
-    fs.rmSync(profileDir, { recursive: true });
-    return {
-      success: false,
-      error: "Failed to load config",
-    };
-  }
-
-  config.profiles.push({
-    name: profileName,
-    source,
-    installed_at: new Date().toISOString(),
-  });
-
-  saveConfig(paths, fs, config);
-
-  return {
-    success: true,
-    message: `Profile "${profileName}" installed successfully!\nUse "openstack use ${profileName}" to activate it.`,
-  };
-}
-
-export function use(
-  paths: Paths,
-  fs: FileSystem,
-  options: UseOptions,
-): UseOutput {
-  const config = loadConfig(paths, fs);
-  if (!config) {
-    return { success: false, error: "Failed to load config" };
-  }
-
-  const profile = config.profiles.find((p) => p.name === options.name);
-  if (!profile) {
-    return {
-      success: false,
-      error: `Profile "${options.name}" not found. Run "openstack list" to see available profiles.`,
-    };
-  }
-
-  const profileDir = path.join(paths.profilesDir, options.name);
-  if (!fs.existsSync(profileDir)) {
-    return {
-      success: false,
-      error: `Profile "${options.name}" directory not found at ${profileDir}`,
-    };
-  }
-
-  if (fs.existsSync(paths.opencodeDir)) {
-    const entries = fs.readdirSync(paths.opencodeDir, { withFileTypes: true });
-    for (const entry of entries) {
-      const entryPath = path.join(paths.opencodeDir, entry.name);
-      try {
-        const stats = fs.lstatSync(entryPath);
-        if (stats.isSymbolicLink()) {
-          fs.unlinkSync(entryPath);
-        }
-      } catch {
-        // Ignore errors for non-symlinks
-      }
-    }
-  } else {
-    fs.mkdirSync(paths.opencodeDir, { recursive: true });
-  }
-
-  const entries = fs.readdirSync(profileDir, { withFileTypes: true });
-  for (const entry of entries) {
-    const srcPath = path.join(profileDir, entry.name);
-    const destPath = path.join(paths.opencodeDir, entry.name);
-    fs.symlinkSync(srcPath, destPath);
-  }
-
-  config.active_profile = options.name;
-  saveConfig(paths, fs, config);
-
-  return {
-    success: true,
-    message: `Switched to profile "${options.name}"`,
-  };
-}
-
 export interface ProfileListItem {
   name: string;
   source: string;
@@ -337,4 +197,82 @@ export function list(paths: Paths, fs: FileSystem): ProfileListItem[] | null {
     source: p.source,
     isActive: p.name === config.active_profile,
   }));
+}
+
+export interface RemoveOptions {
+  name: string;
+  force?: boolean;
+}
+
+export interface RemoveResult {
+  success: true;
+  message: string;
+}
+
+export interface RemoveError {
+  success: false;
+  error: string;
+}
+
+export type RemoveOutput = RemoveResult | RemoveError;
+
+export function remove(
+  paths: Paths,
+  fs: FileSystem,
+  options: RemoveOptions,
+): RemoveOutput {
+  const config = loadConfig(paths, fs);
+  if (!config) {
+    return { success: false, error: "Failed to load config" };
+  }
+
+  const profileIndex = config.profiles.findIndex((p) => p.name === options.name);
+  if (profileIndex === -1) {
+    return {
+      success: false,
+      error: `Profile "${options.name}" not found`,
+    };
+  }
+
+  // Prevent removing active profile unless forced
+  if (config.active_profile === options.name && !options.force) {
+    return {
+      success: false,
+      error: `Cannot remove active profile "${options.name}". Switch to another profile first, or use --force.`,
+    };
+  }
+
+  const profileDir = path.join(paths.profilesDir, options.name);
+  if (fs.existsSync(profileDir)) {
+    fs.rmSync(profileDir, { recursive: true });
+  }
+
+  // Remove from config
+  config.profiles.splice(profileIndex, 1);
+
+  // If we removed the active profile (with force), switch to default
+  if (config.active_profile === options.name) {
+    config.active_profile = "default";
+  }
+
+  saveConfig(paths, fs, config);
+
+  return {
+    success: true,
+    message: `Profile "${options.name}" removed successfully`,
+  };
+}
+
+export function install(
+  _paths: Paths,
+  _fs: FileSystem,
+  _git: GitRunner,
+  _source: string,
+  _options: { name?: string },
+): InstallOutput {
+  return { success: false, error: "Not yet implemented" };
+}
+
+export function use(_name: string): string {
+  return "Not yet implemented";
 }
