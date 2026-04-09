@@ -1,32 +1,31 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import * as fs from "fs";
 import * as path from "path";
-import * as os from "os";
+import {
+  createTestDir,
+  setupTestDir,
+  cleanupTestDir,
+  createMockOpencodeDir,
+  createMockProfileDir,
+  formatProfileList,
+  type Profile,
+} from "./fixtures";
 
 describe("CLI Integration", () => {
-  const testDir = path.join(os.tmpdir(), "openstack-cli-test-" + Date.now());
+  let testDir: string;
 
   beforeEach(() => {
-    fs.mkdirSync(testDir, { recursive: true });
+    testDir = createTestDir("openstack-cli-test");
+    setupTestDir(testDir);
   });
 
   afterEach(() => {
-    fs.rmSync(testDir, { recursive: true, force: true });
-  });
-
-  describe("GIVEN the test environment", () => {
-    it("SHOULD create and cleanup test directories", () => {
-      const testSubDir = path.join(testDir, "subdir");
-      fs.mkdirSync(testSubDir, { recursive: true });
-      expect(fs.existsSync(testSubDir)).toBe(true);
-    });
+    cleanupTestDir(testDir);
   });
 
   describe("GIVEN an opencode-like directory structure", () => {
     it("SHOULD detect AGENTS.md presence", () => {
-      const opencodeDir = path.join(testDir, "opencode");
-      fs.mkdirSync(opencodeDir, { recursive: true });
-      fs.writeFileSync(path.join(opencodeDir, "AGENTS.md"), "# Test Config");
+      const opencodeDir = createMockOpencodeDir(testDir, "# Test Config");
 
       expect(fs.existsSync(path.join(opencodeDir, "AGENTS.md"))).toBe(true);
     });
@@ -41,16 +40,13 @@ describe("CLI Integration", () => {
 
   describe("GIVEN profile directory structure", () => {
     it("SHOULD create profiles directory structure", () => {
-      const profilesDir = path.join(testDir, "profiles");
-      const defaultProfile = path.join(profilesDir, "default");
-      const skillsDir = path.join(defaultProfile, "skills");
+      const profileDir = createMockProfileDir(testDir, "default");
+      const skillsDir = path.join(profileDir, "skills");
 
-      fs.mkdirSync(skillsDir, { recursive: true });
-      fs.writeFileSync(path.join(defaultProfile, "AGENTS.md"), "# Default");
       fs.writeFileSync(path.join(skillsDir, "test.md"), "skill");
 
-      expect(fs.existsSync(defaultProfile)).toBe(true);
-      expect(fs.existsSync(path.join(defaultProfile, "AGENTS.md"))).toBe(true);
+      expect(fs.existsSync(profileDir)).toBe(true);
+      expect(fs.existsSync(path.join(profileDir, "AGENTS.md"))).toBe(true);
     });
   });
 
@@ -88,17 +84,14 @@ describe("CLI Integration", () => {
 describe("Config listing display", () => {
   describe("GIVEN profiles list", () => {
     it("SHOULD format profile names correctly", () => {
-      const profiles = [
+      const profiles: Profile[] = [
         { name: "default", source: "local" },
         { name: "work", source: "git" },
         { name: "personal", source: "local" },
       ];
       const activeProfile = "work";
 
-      const formatted = profiles.map((p) => {
-        const marker = p.name === activeProfile ? "*" : " ";
-        return `  ${marker} ${p.name.padEnd(12)} (${p.source})`;
-      });
+      const formatted = formatProfileList(profiles, activeProfile);
 
       expect(formatted[0]).toBe("    default      (local)");
       expect(formatted[1]).toBe("  * work         (git)");

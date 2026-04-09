@@ -1,32 +1,36 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import * as fs from "fs";
 import * as path from "path";
-import * as os from "os";
 import * as YAML from "yaml";
+import {
+  validConfigYaml,
+  configWithMultipleProfilesYaml,
+  emptyProfilesConfigYaml,
+  createTestDir,
+  setupTestDir,
+  cleanupTestDir,
+  writeConfigFile,
+  readConfigFile,
+} from "./fixtures";
 
 describe("Config file operations", () => {
-  const testDir = path.join(os.tmpdir(), "openstack-config-test-" + Date.now());
-  const configFile = path.join(testDir, "config.yaml");
+  let testDir: string;
+  let configFile: string;
 
   beforeEach(() => {
-    fs.mkdirSync(testDir, { recursive: true });
+    testDir = createTestDir("openstack-config-test");
+    configFile = path.join(testDir, "config.yaml");
+    setupTestDir(testDir);
   });
 
   afterEach(() => {
-    fs.rmSync(testDir, { recursive: true, force: true });
+    cleanupTestDir(testDir);
   });
 
   describe("GIVEN a valid config file", () => {
     it("SHOULD parse with YAML library", () => {
-      const configContent = `version: "0.1.0"
-active_profile: "default"
-profiles:
-  - name: "default"
-    source: "local"
-    installed_at: "2025-01-09T10:00:00Z"`;
-
-      fs.writeFileSync(configFile, configContent);
-      const content = fs.readFileSync(configFile, "utf-8");
+      writeConfigFile(configFile, validConfigYaml);
+      const content = readConfigFile(configFile);
       const parsed = YAML.parse(content);
 
       expect(parsed.version).toBe("0.1.0");
@@ -38,18 +42,8 @@ profiles:
 
   describe("GIVEN a config with multiple profiles", () => {
     it("SHOULD parse all profiles correctly", () => {
-      const configContent = `version: "0.1.0"
-active_profile: "work"
-profiles:
-  - name: "default"
-    source: "local"
-    installed_at: "2025-01-09T10:00:00Z"
-  - name: "work"
-    source: "https://github.com/user/repo"
-    installed_at: "2025-01-09T11:00:00Z"`;
-
-      fs.writeFileSync(configFile, configContent);
-      const content = fs.readFileSync(configFile, "utf-8");
+      writeConfigFile(configFile, configWithMultipleProfilesYaml);
+      const content = readConfigFile(configFile);
       const parsed = YAML.parse(content);
 
       expect(parsed.profiles).toHaveLength(2);
@@ -59,12 +53,8 @@ profiles:
 
   describe("GIVEN an empty profiles list", () => {
     it("SHOULD parse successfully", () => {
-      const configContent = `version: "0.1.0"
-active_profile: "default"
-profiles: []`;
-
-      fs.writeFileSync(configFile, configContent);
-      const content = fs.readFileSync(configFile, "utf-8");
+      writeConfigFile(configFile, emptyProfilesConfigYaml);
+      const content = readConfigFile(configFile);
       const parsed = YAML.parse(content);
 
       expect(parsed.profiles).toHaveLength(0);
@@ -74,22 +64,25 @@ profiles: []`;
   describe("GIVEN a non-existent config file", () => {
     it("SHOULD throw when reading", () => {
       const nonExistentFile = path.join(testDir, "non-existent.yaml");
-      expect(() => fs.readFileSync(nonExistentFile, "utf-8")).toThrow();
+      expect(() => readConfigFile(nonExistentFile)).toThrow();
     });
   });
 });
 
 describe("Directory operations", () => {
-  const testDir = path.join(os.tmpdir(), "openstack-dir-test-" + Date.now());
-  const profilesDir = path.join(testDir, "profiles");
-  const defaultProfileDir = path.join(profilesDir, "default");
+  let testDir: string;
+  let profilesDir: string;
+  let defaultProfileDir: string;
 
   beforeEach(() => {
-    fs.mkdirSync(testDir, { recursive: true });
+    testDir = createTestDir("openstack-dir-test");
+    profilesDir = path.join(testDir, "profiles");
+    defaultProfileDir = path.join(profilesDir, "default");
+    setupTestDir(testDir);
   });
 
   afterEach(() => {
-    fs.rmSync(testDir, { recursive: true, force: true });
+    cleanupTestDir(testDir);
   });
 
   describe("GIVEN creating directory structure", () => {
