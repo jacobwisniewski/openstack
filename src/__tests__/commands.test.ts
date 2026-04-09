@@ -99,11 +99,7 @@ describe("saveConfig and loadConfig", () => {
       saveConfig(paths, fileSystem, testConfig);
       const loaded = loadConfig(paths, fileSystem);
 
-      expect(loaded).not.toBeNull();
-      expect(loaded!.version).toBe(testConfig.version);
-      expect(loaded!.active_profile).toBe(testConfig.active_profile);
-      expect(loaded!.profiles).toHaveLength(1);
-      expect(loaded!.profiles[0].name).toBe("default");
+      expect(loaded).toEqual(testConfig);
     });
   });
 
@@ -131,9 +127,7 @@ describe("saveConfig and loadConfig", () => {
       saveConfig(paths, fileSystem, multiProfileConfig);
       const loaded = loadConfig(paths, fileSystem);
 
-      expect(loaded).not.toBeNull();
-      expect(loaded!.profiles).toHaveLength(2);
-      expect(loaded!.active_profile).toBe("work");
+      expect(loaded).toEqual(multiProfileConfig);
     });
   });
 
@@ -322,12 +316,10 @@ describe("list", () => {
 
       const profiles = list(paths, fileSystem);
 
-      expect(profiles).not.toBeNull();
-      expect(profiles).toHaveLength(2);
-      expect(profiles![0].name).toBe("default");
-      expect(profiles![0].isActive).toBe(true);
-      expect(profiles![1].name).toBe("work");
-      expect(profiles![1].isActive).toBe(false);
+      expect(profiles).toEqual([
+        { name: "default", source: "local", isActive: true },
+        { name: "work", source: "https://github.com/user/repo", isActive: false },
+      ]);
     });
   });
 });
