@@ -1,0 +1,12 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["eslint", "typescript"],
+  "env": {
+    "node": true,
+    "es2022": true
+  },
+  "rules": {
+    "prefer-const": "error",
+    "typescript/consistent-type-assertions": ["error", { "assertionStyle": "never" }]
+  }
+}
