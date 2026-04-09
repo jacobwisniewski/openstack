@@ -106,12 +106,10 @@ export function init(
   options: InitOptions,
   packageVersion: string,
 ): InitOutput {
-  // Check if opencode exists
-  if (!fs.existsSync(path.join(paths.opencodeDir, "AGENTS.md"))) {
-    return { success: false, error: "OpenCode config not found" };
+  if (!fs.existsSync(paths.opencodeDir)) {
+    return { success: false, error: "OpenCode config directory not found at ~/.config/opencode" };
   }
 
-  // Check if already initialized
   if (isInitialized(paths, fs) && !options.force) {
     return {
       success: false,
@@ -120,7 +118,6 @@ export function init(
     };
   }
 
-  // Create directories
   if (!fs.existsSync(paths.openstackDir)) {
     fs.mkdirSync(paths.openstackDir, { recursive: true });
   }
@@ -128,7 +125,6 @@ export function init(
     fs.mkdirSync(paths.profilesDir, { recursive: true });
   }
 
-  // Backup current config to profiles/default/
   const defaultProfileDir = path.join(paths.profilesDir, "default");
 
   if (fs.existsSync(defaultProfileDir) && options.force) {
@@ -137,12 +133,6 @@ export function init(
 
   copyDir(fs, paths.opencodeDir, defaultProfileDir);
 
-  // Verify backup
-  if (!fs.existsSync(path.join(defaultProfileDir, "AGENTS.md"))) {
-    return { success: false, error: "Backup failed: AGENTS.md not found in backup." };
-  }
-
-  // Create config
   const config: OpenStackConfig = {
     version: packageVersion,
     active_profile: "default",

@@ -232,7 +232,7 @@ describe("init", () => {
 
       expect(result.success).toBe(false);
       if (!result.success) {
-        expect(result.error).toContain("OpenCode config not found");
+        expect(result.error).toContain("OpenCode config directory not found");
       }
     });
   });
