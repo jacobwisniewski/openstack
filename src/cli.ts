@@ -8,7 +8,6 @@ import { init, list, install, use, type Paths, type FileSystem } from "./command
 const PACKAGE_JSON_PATH = path.join(__dirname, "..", "package.json");
 const PACKAGE_VERSION = JSON.parse(fs.readFileSync(PACKAGE_JSON_PATH, "utf-8")).version;
 
-// Create production dependencies
 function createPaths(): Paths {
   const homeDir = os.homedir();
   return {
@@ -29,7 +28,6 @@ const fileSystem: FileSystem = {
   rmSync: fs.rmSync,
 };
 
-// Error handling helper
 function handleError(message: string): never {
   console.error(`Error: ${message}`);
   process.exit(1);

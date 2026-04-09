@@ -14,7 +14,6 @@ import {
   type OpenStackConfig,
 } from "../commands";
 
-// Create real filesystem for integration tests
 function createRealFileSystem(): FileSystem {
   return {
     existsSync: fs.existsSync,
@@ -27,7 +26,6 @@ function createRealFileSystem(): FileSystem {
   };
 }
 
-// Create paths for test directory
 function createTestPaths(testDir: string): Paths {
   return {
     openstackDir: path.join(testDir, ".config", "openstack"),

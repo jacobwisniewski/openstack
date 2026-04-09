@@ -3,7 +3,6 @@ import * as path from "path";
 import * as YAML from "yaml";
 import { validateConfig, type ValidatedOpenStackConfig } from "./validation";
 
-// Types
 export interface FileSystem {
   existsSync: typeof fs.existsSync;
   mkdirSync: typeof fs.mkdirSync;
@@ -48,8 +47,6 @@ export interface InitError {
 }
 
 export type InitOutput = InitResult | InitError;
-
-// Pure functions
 
 export function isInitialized(paths: Paths, fs: FileSystem): boolean {
   return fs.existsSync(paths.configFile);
@@ -102,8 +99,6 @@ export function copyDir(fs: FileSystem, src: string, dest: string): void {
     }
   }
 }
-
-// Command implementations (pure functions returning results)
 
 export function init(
   paths: Paths,
@@ -194,7 +189,6 @@ export function list(paths: Paths, fs: FileSystem): ProfileListItem[] | null {
   }));
 }
 
-// Placeholder commands
 export function install(_source: string, _name?: string): string {
   return "Not yet implemented";
 }
