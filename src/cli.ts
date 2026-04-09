@@ -3,6 +3,7 @@ import { program } from "commander";
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
+import { validateConfig } from "./validation";
 
 const OPENSTACK_DIR = path.join(os.homedir(), ".config", "openstack");
 const OPENCODE_DIR = path.join(os.homedir(), ".config", "opencode");
@@ -36,7 +37,7 @@ function requireInit(): void {
   }
 }
 
-function loadConfig(): OpenStackConfig {
+function loadConfig(): import("./validation").ValidatedOpenStackConfig {
   if (!fs.existsSync(CONFIG_FILE)) {
     error("Config file not found. Run 'openstack init' first.");
   }
@@ -88,11 +89,17 @@ function loadConfig(): OpenStackConfig {
     });
   }
 
-  return {
+  const rawConfig = {
     version,
     active_profile: activeProfile,
     profiles,
   };
+
+  const validationResult = validateConfig(rawConfig);
+  if (validationResult.isErr()) {
+    error(`Invalid config: ${validationResult.error}`);
+  }
+  return validationResult.value;
 }
 
 function saveConfig(config: OpenStackConfig): void {
