@@ -189,6 +189,70 @@ export function list(paths: Paths, fs: FileSystem): ProfileListItem[] | null {
   }));
 }
 
+export interface RemoveOptions {
+  name: string;
+  force?: boolean;
+}
+
+export interface RemoveResult {
+  success: true;
+  message: string;
+}
+
+export interface RemoveError {
+  success: false;
+  error: string;
+}
+
+export type RemoveOutput = RemoveResult | RemoveError;
+
+export function remove(
+  paths: Paths,
+  fs: FileSystem,
+  options: RemoveOptions,
+): RemoveOutput {
+  const config = loadConfig(paths, fs);
+  if (!config) {
+    return { success: false, error: "Failed to load config" };
+  }
+
+  const profileIndex = config.profiles.findIndex((p) => p.name === options.name);
+  if (profileIndex === -1) {
+    return {
+      success: false,
+      error: `Profile "${options.name}" not found`,
+    };
+  }
+
+  // Prevent removing active profile unless forced
+  if (config.active_profile === options.name && !options.force) {
+    return {
+      success: false,
+      error: `Cannot remove active profile "${options.name}". Switch to another profile first, or use --force.`,
+    };
+  }
+
+  const profileDir = path.join(paths.profilesDir, options.name);
+  if (fs.existsSync(profileDir)) {
+    fs.rmSync(profileDir, { recursive: true });
+  }
+
+  // Remove from config
+  config.profiles.splice(profileIndex, 1);
+
+  // If we removed the active profile (with force), switch to default
+  if (config.active_profile === options.name) {
+    config.active_profile = "default";
+  }
+
+  saveConfig(paths, fs, config);
+
+  return {
+    success: true,
+    message: `Profile "${options.name}" removed successfully`,
+  };
+}
+
 export function install(_source: string, _name?: string): string {
   return "Not yet implemented";
 }
