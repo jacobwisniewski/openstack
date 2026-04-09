@@ -23,6 +23,9 @@ function createRealFileSystem(): FileSystem {
     copyFileSync: fs.copyFileSync,
     readdirSync: fs.readdirSync,
     rmSync: fs.rmSync,
+    symlinkSync: fs.symlinkSync,
+    unlinkSync: fs.unlinkSync,
+    lstatSync: fs.lstatSync,
   };
 }
 
@@ -232,7 +235,7 @@ describe("init", () => {
 
       expect(result.success).toBe(false);
       if (!result.success) {
-        expect(result.error).toContain("OpenCode config not found");
+        expect(result.error).toContain("OpenCode config directory not found");
       }
     });
   });
