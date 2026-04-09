@@ -35,12 +35,6 @@ openstack lets you easily switch between different OpenCode configurations. Each
 - **Easy to remove** - Just `openstack use default` to go back
 - **Simple** - No magic, just symlink management
 
-## Documentation
-
-- [Development Plan](docs/plan.md) - Architecture and implementation details
-- [Creating Profiles](docs/creating-profiles.md) - How to make your own profile
-- [CLI Reference](docs/cli.md) - Command documentation
-
 ## License
 
 MIT
