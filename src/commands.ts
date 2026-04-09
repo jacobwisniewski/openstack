@@ -13,6 +13,10 @@ export interface FileSystem {
   rmSync: typeof fs.rmSync;
 }
 
+export interface GitRunner {
+  clone: (url: string, dest: string) => void;
+}
+
 export interface OpenStackConfig {
   version: string;
   active_profile: string;
@@ -47,6 +51,22 @@ export interface InitError {
 }
 
 export type InitOutput = InitResult | InitError;
+
+export interface InstallOptions {
+  name?: string;
+}
+
+export interface InstallResult {
+  success: true;
+  message: string;
+}
+
+export interface InstallError {
+  success: false;
+  error: string;
+}
+
+export type InstallOutput = InstallResult | InstallError;
 
 export function isInitialized(paths: Paths, fs: FileSystem): boolean {
   return fs.existsSync(paths.configFile);
@@ -100,18 +120,30 @@ export function copyDir(fs: FileSystem, src: string, dest: string): void {
   }
 }
 
+export function extractProfileName(url: string, customName?: string): string {
+  if (customName) {
+    return customName;
+  }
+
+  // Extract from URL like https://github.com/user/repo.git or https://github.com/user/repo
+  const match = url.match(/\/([^/]+?)(?:\.git)?$/);
+  if (match) {
+    return match[1];
+  }
+
+  throw new Error("Could not extract profile name from URL");
+}
+
 export function init(
   paths: Paths,
   fs: FileSystem,
   options: InitOptions,
   packageVersion: string,
 ): InitOutput {
-  // Check if opencode exists
   if (!fs.existsSync(path.join(paths.opencodeDir, "AGENTS.md"))) {
     return { success: false, error: "OpenCode config not found" };
   }
 
-  // Check if already initialized
   if (isInitialized(paths, fs) && !options.force) {
     return {
       success: false,
@@ -120,7 +152,6 @@ export function init(
     };
   }
 
-  // Create directories
   if (!fs.existsSync(paths.openstackDir)) {
     fs.mkdirSync(paths.openstackDir, { recursive: true });
   }
@@ -128,7 +159,6 @@ export function init(
     fs.mkdirSync(paths.profilesDir, { recursive: true });
   }
 
-  // Backup current config to profiles/default/
   const defaultProfileDir = path.join(paths.profilesDir, "default");
 
   if (fs.existsSync(defaultProfileDir) && options.force) {
@@ -137,12 +167,10 @@ export function init(
 
   copyDir(fs, paths.opencodeDir, defaultProfileDir);
 
-  // Verify backup
   if (!fs.existsSync(path.join(defaultProfileDir, "AGENTS.md"))) {
     return { success: false, error: "Backup failed: AGENTS.md not found in backup." };
   }
 
-  // Create config
   const config: OpenStackConfig = {
     version: packageVersion,
     active_profile: "default",
@@ -170,6 +198,63 @@ export function init(
   };
 }
 
+export function install(
+  paths: Paths,
+  fs: FileSystem,
+  git: GitRunner,
+  source: string,
+  options: InstallOptions,
+): InstallOutput {
+  const profileName = extractProfileName(source, options.name);
+  const profileDir = path.join(paths.profilesDir, profileName);
+
+  if (fs.existsSync(profileDir)) {
+    return {
+      success: false,
+      error: `Profile "${profileName}" already exists. Remove it first or use a different name.`,
+    };
+  }
+
+  try {
+    git.clone(source, profileDir);
+  } catch {
+    return {
+      success: false,
+      error: `Failed to clone from ${source}`,
+    };
+  }
+
+  if (!fs.existsSync(path.join(profileDir, "AGENTS.md"))) {
+    fs.rmSync(profileDir, { recursive: true });
+    return {
+      success: false,
+      error: `Profile "${profileName}" is invalid: no AGENTS.md found`,
+    };
+  }
+
+  const config = loadConfig(paths, fs);
+  if (!config) {
+    fs.rmSync(profileDir, { recursive: true });
+    return {
+      success: false,
+      error: "Failed to load config",
+    };
+  }
+
+  config.profiles.push({
+    name: profileName,
+    source,
+    installed_at: new Date().toISOString(),
+  });
+
+  saveConfig(paths, fs, config);
+
+  return {
+    success: true,
+    message: `Profile "${profileName}" installed successfully!\nUse "openstack use ${profileName}" to activate it.`,
+  };
+}
+
 export interface ProfileListItem {
   name: string;
   source: string;
@@ -187,10 +272,6 @@ export function list(paths: Paths, fs: FileSystem): ProfileListItem[] | null {
     source: p.source,
     isActive: p.name === config.active_profile,
   }));
-}
-
-export function install(_source: string, _name?: string): string {
-  return "Not yet implemented";
 }
 
 export function use(_name: string): string {
