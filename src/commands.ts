@@ -16,6 +16,10 @@ export interface FileSystem {
   lstatSync: typeof fs.lstatSync;
 }
 
+export interface GitRunner {
+  clone: (url: string, dest: string) => void;
+}
+
 export interface OpenStackConfig {
   version: string;
   active_profile: string;
@@ -50,6 +54,22 @@ export interface InitError {
 }
 
 export type InitOutput = InitResult | InitError;
+
+export interface InstallOptions {
+  name?: string;
+}
+
+export interface InstallResult {
+  success: true;
+  message: string;
+}
+
+export interface InstallError {
+  success: false;
+  error: string;
+}
+
+export type InstallOutput = InstallResult | InstallError;
 
 export interface UseOptions {
   name: string;
@@ -119,6 +139,19 @@ export function copyDir(fs: FileSystem, src: string, dest: string): void {
   }
 }
 
+export function extractProfileName(url: string, customName?: string): string {
+  if (customName) {
+    return customName;
+  }
+
+  const match = url.match(/\/([^/]+?)(?:\.git)?$/);
+  if (match) {
+    return match[1];
+  }
+
+  throw new Error("Could not extract profile name from URL");
+}
+
 export function init(
   paths: Paths,
   fs: FileSystem,
@@ -179,6 +212,55 @@ export function init(
   };
 }
 
+export function install(
+  paths: Paths,
+  fs: FileSystem,
+  git: GitRunner,
+  source: string,
+  options: InstallOptions,
+): InstallOutput {
+  const profileName = extractProfileName(source, options.name);
+  const profileDir = path.join(paths.profilesDir, profileName);
+
+  if (fs.existsSync(profileDir)) {
+    return {
+      success: false,
+      error: `Profile "${profileName}" already exists. Remove it first or use a different name.`,
+    };
+  }
+
+  try {
+    git.clone(source, profileDir);
+  } catch {
+    return {
+      success: false,
+      error: `Failed to clone from ${source}`,
+    };
+  }
+
+  const config = loadConfig(paths, fs);
+  if (!config) {
+    fs.rmSync(profileDir, { recursive: true });
+    return {
+      success: false,
+      error: "Failed to load config",
+    };
+  }
+
+  config.profiles.push({
+    name: profileName,
+    source,
+    installed_at: new Date().toISOString(),
+  });
+
+  saveConfig(paths, fs, config);
+
+  return {
+    success: true,
+    message: `Profile "${profileName}" installed successfully!\nUse "openstack use ${profileName}" to activate it.`,
+  };
+}
+
 export function use(
   paths: Paths,
   fs: FileSystem,
@@ -205,7 +287,6 @@ export function use(
     };
   }
 
-  // Remove existing symlinks in opencode dir
   if (fs.existsSync(paths.opencodeDir)) {
     const entries = fs.readdirSync(paths.opencodeDir, { withFileTypes: true });
     for (const entry of entries) {
@@ -223,7 +304,6 @@ export function use(
     fs.mkdirSync(paths.opencodeDir, { recursive: true });
   }
 
-  // Create new symlinks
   const entries = fs.readdirSync(profileDir, { withFileTypes: true });
   for (const entry of entries) {
     const srcPath = path.join(profileDir, entry.name);
@@ -231,7 +311,6 @@ export function use(
     fs.symlinkSync(srcPath, destPath);
   }
 
-  // Update config
   config.active_profile = options.name;
   saveConfig(paths, fs, config);
 
@@ -258,8 +337,4 @@ export function list(paths: Paths, fs: FileSystem): ProfileListItem[] | null {
     source: p.source,
     isActive: p.name === config.active_profile,
   }));
-}
-
-export function install(_source: string, _name?: string): string {
-  return "Not yet implemented";
 }
