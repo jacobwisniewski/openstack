@@ -2,8 +2,9 @@
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
+import { execSync } from "child_process";
 import { program } from "commander";
-import { init, list, install, use, type Paths, type FileSystem } from "./commands";
+import { init, list, install, use, type Paths, type FileSystem, type GitRunner } from "./commands";
 
 const PACKAGE_JSON_PATH = path.join(__dirname, "..", "package.json");
 const PACKAGE_VERSION = JSON.parse(fs.readFileSync(PACKAGE_JSON_PATH, "utf-8")).version;
@@ -26,6 +27,12 @@ const fileSystem: FileSystem = {
   copyFileSync: fs.copyFileSync,
   readdirSync: fs.readdirSync,
   rmSync: fs.rmSync,
+};
+
+const gitRunner: GitRunner = {
+  clone: (url: string, dest: string) => {
+    execSync(`git clone --depth 1 "${url}" "${dest}"`, { stdio: "inherit" });
+  },
 };
 
 function handleError(message: string): never {
@@ -57,8 +64,13 @@ program
   .description("Install a profile from git URL or local path")
   .option("-n, --name <name>", "Custom name for the profile")
   .action((source, options) => {
-    const message = install(source, options.name);
-    console.log(message);
+    const paths = createPaths();
+    const result = install(paths, fileSystem, gitRunner, source, { name: options.name });
+
+    if (!result.success) {
+      handleError(result.error);
+    }
+    console.log(result.message);
   });
 
 program
