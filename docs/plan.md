@@ -68,23 +68,33 @@ profiles:
   - `<source>`: Git URL (https://github.com/user/repo) or local path
   - Optional: `--name <name>` to override directory name
 - **Actions**:
-  1. Clone git repo to `profiles/<name>/`
-  2. Validate basic structure (AGENTS.md exists)
-  3. Add to config.yaml
-- **Errors**: Fail if AGENTS.md missing, fail if name exists
+  1. **Check initialized**: Fail if `~/.config/openstack/` doesn't exist (require `init` first)
+  2. Clone git repo to `profiles/<name>/`
+  3. Validate basic structure (AGENTS.md exists)
+  4. Add to config.yaml
+- **Errors**: 
+  - Fail if not initialized ("Run openstack init first")
+  - Fail if AGENTS.md missing
+  - Fail if name exists
 
 #### `openstack use <name>`
 - **Purpose**: Switch to a profile
 - **Actions**:
-  1. Validate profile exists
-  2. Remove existing symlinks in `~/.config/opencode/`
-  3. Create new symlinks pointing to `profiles/<name>/`
-  4. Validate opencode.json against schema (optional, warn on failure)
-  5. Update config.yaml active_profile
-- **Errors**: Fail if profile doesn't exist, fail if symlinks can't be created
+  1. **Check initialized**: Fail if `~/.config/openstack/` doesn't exist (require `init` first)
+  2. Validate profile exists
+  3. Remove existing symlinks in `~/.config/opencode/`
+  4. Create new symlinks pointing to `profiles/<name>/`
+  5. Validate opencode.json against schema (optional, warn on failure)
+  6. Update config.yaml active_profile
+- **Errors**: 
+  - Fail if not initialized ("Run openstack init first")
+  - Fail if profile doesn't exist
+  - Fail if symlinks can't be created
 
 #### `openstack list`
 - **Purpose**: Show installed profiles
+- **Actions**:
+  1. **Check initialized**: Fail if `~/.config/openstack/` doesn't exist (require `init` first)
 - **Output**:
   ```
   * default    (local)     [current]
@@ -124,11 +134,26 @@ profiles:
 - SKILL.md frontmatter parsing
 - AGENTS.md structure validation
 
+### Safety: Initialization Required
+
+**All commands require `openstack init` first.** This prevents accidental loss of current config.
+
+**Protection mechanism**:
+- `install`, `use`, `list` check for `~/.config/openstack/config.yaml`
+- If missing, fail with: "Error: openstack not initialized. Run 'openstack init' first to backup your current config."
+- This ensures `profiles/default/` backup exists before any modifications
+
+**Recovery if someone skips init**:
+- Their original config remains untouched in `~/.config/opencode/`
+- They just need to run `openstack init` to create the backup
+- Then all commands work normally
+
 ### Error Handling
 
 **Principle**: Fail fast, loud errors
 
 **Error cases**:
+- Not initialized (run `init` first)
 - Opencode not installed/configured
 - Profile doesn't exist
 - Git clone fails
@@ -226,14 +251,6 @@ ln -s ~/.config/openstack/profiles/<name>/opencode.json ~/.config/opencode/openc
 - Keep door open for Claude Code, Codex CLI support
 - Abstract "profile" concept from OpenCode specifics
 - Tool-specific adapters
-
-### Package Managers
-- Homebrew formula (eventually)
-- AUR package (community)
-
-### IDE Integration
-- VS Code extension for profile switching
-- TUI mode for interactive profile management
 
 ## Success Metrics
 
