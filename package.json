@@ -1,0 +1,38 @@
+{
+  "name": "@jacobwisniewski/openstack",
+  "version": "0.1.0",
+  "description": "Simple profile management for OpenCode configurations",
+  "main": "dist/index.js",
+  "bin": {
+    "openstack": "dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "prepare": "npm run build"
+  },
+  "keywords": [
+    "opencode",
+    "cli",
+    "profile",
+    "config",
+    "ai"
+  ],
+  "author": "Jacob Wisniewski",
+  "license": "MIT",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "commander": "^12.0.0"
+  }
+}
