@@ -252,14 +252,6 @@ ln -s ~/.config/openstack/profiles/<name>/opencode.json ~/.config/opencode/openc
 - Abstract "profile" concept from OpenCode specifics
 - Tool-specific adapters
 
-### Package Managers
-- Homebrew formula (eventually)
-- AUR package (community)
-
-### IDE Integration
-- VS Code extension for profile switching
-- TUI mode for interactive profile management
-
 ## Success Metrics
 
 - Can install and use a profile in < 30 seconds
