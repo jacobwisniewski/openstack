@@ -3,7 +3,11 @@ import { program } from "commander";
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
-import { validateConfig } from "./validation";
+import * as YAML from "yaml";
+import { validateConfig, type ValidatedOpenStackConfig } from "./validation";
+
+const PACKAGE_JSON_PATH = path.join(__dirname, "..", "package.json");
+const PACKAGE_VERSION = JSON.parse(fs.readFileSync(PACKAGE_JSON_PATH, "utf-8")).version;
 
 const OPENSTACK_DIR = path.join(os.homedir(), ".config", "openstack");
 const OPENCODE_DIR = path.join(os.homedir(), ".config", "opencode");
@@ -37,63 +41,12 @@ function requireInit(): void {
   }
 }
 
-function loadConfig(): import("./validation").ValidatedOpenStackConfig {
+function loadConfig(): ValidatedOpenStackConfig {
   if (!fs.existsSync(CONFIG_FILE)) {
     error("Config file not found. Run 'openstack init' first.");
   }
   const content = fs.readFileSync(CONFIG_FILE, "utf-8");
-  // Simple YAML-like parsing for now
-  const lines = content.split("\n");
-  const profiles: ProfileEntry[] = [];
-  let version = "";
-  let activeProfile = "";
-  let inProfiles = false;
-  let currentName = "";
-  let currentSource = "";
-  let currentInstalledAt = "";
-
-  for (const line of lines) {
-    const trimmed = line.trim();
-
-    if (trimmed.startsWith("version:")) {
-      version = trimmed.split(":")[1].trim().replace(/"/g, "");
-    } else if (trimmed.startsWith("active_profile:")) {
-      activeProfile = trimmed.split(":")[1].trim().replace(/"/g, "");
-    } else if (trimmed === "profiles:") {
-      inProfiles = true;
-    } else if (inProfiles && trimmed.startsWith("- name:")) {
-      // Save previous profile if exists
-      if (currentName) {
-        profiles.push({
-          name: currentName,
-          source: currentSource,
-          installed_at: currentInstalledAt,
-        });
-      }
-      currentName = trimmed.split(":")[1].trim().replace(/"/g, "");
-      currentSource = "";
-      currentInstalledAt = "";
-    } else if (inProfiles && trimmed.startsWith("source:")) {
-      currentSource = trimmed.split(":")[1].trim().replace(/"/g, "");
-    } else if (inProfiles && trimmed.startsWith("installed_at:")) {
-      currentInstalledAt = trimmed.split(":").slice(1).join(":").trim().replace(/"/g, "");
-    }
-  }
-
-  // Don't forget the last profile
-  if (currentName) {
-    profiles.push({
-      name: currentName,
-      source: currentSource,
-      installed_at: currentInstalledAt,
-    });
-  }
-
-  const rawConfig = {
-    version,
-    active_profile: activeProfile,
-    profiles,
-  };
+  const rawConfig = YAML.parse(content);
 
   const validationResult = validateConfig(rawConfig);
   if (validationResult.isErr()) {
@@ -133,7 +86,7 @@ function copyDir(src: string, dest: string): void {
 program
   .name("openstack")
   .description("Simple profile management for OpenCode configurations")
-  .version("0.1.0");
+  .version(PACKAGE_VERSION);
 
 program
   .command("init")
@@ -182,7 +135,7 @@ program
 
     // Create config
     const config: OpenStackConfig = {
-      version: "0.1.0",
+      version: PACKAGE_VERSION,
       active_profile: "default",
       profiles: [
         {

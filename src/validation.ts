@@ -16,13 +16,19 @@ export const OpenStackConfigSchema = z.object({
 export type ValidatedOpenStackConfig = z.infer<typeof OpenStackConfigSchema>;
 export type ValidatedProfileEntry = z.infer<typeof ProfileEntrySchema>;
 
+function formatZodError(error: z.ZodError): string {
+  return error.issues
+    .map((issue) => {
+      const path = issue.path.length > 0 ? issue.path.join(".") : "root";
+      return `  - ${path}: ${issue.message}`;
+    })
+    .join("\n");
+}
+
 export function validateConfig(data: unknown): Result<ValidatedOpenStackConfig, string> {
   const result = OpenStackConfigSchema.safeParse(data);
   if (!result.success) {
-    const issues = result.error.issues
-      .map((issue) => `${issue.path.join(".")}: ${issue.message}`)
-      .join(", ");
-    return err(issues);
+    return err(`Validation failed:\n${formatZodError(result.error)}`);
   }
   return ok(result.data);
 }
@@ -30,10 +36,7 @@ export function validateConfig(data: unknown): Result<ValidatedOpenStackConfig, 
 export function validateProfileEntry(data: unknown): Result<ValidatedProfileEntry, string> {
   const result = ProfileEntrySchema.safeParse(data);
   if (!result.success) {
-    const issues = result.error.issues
-      .map((issue) => `${issue.path.join(".")}: ${issue.message}`)
-      .join(", ");
-    return err(issues);
+    return err(`Validation failed:\n${formatZodError(result.error)}`);
   }
   return ok(result.data);
 }
