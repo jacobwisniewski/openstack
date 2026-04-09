@@ -38,12 +38,6 @@ const gitRunner: GitRunner = {
   },
 };
 
-const gitRunner: GitRunner = {
-  clone: (url: string, dest: string) => {
-    execSync(`git clone --depth 1 "${url}" "${dest}"`, { stdio: "inherit" });
-  },
-};
-
 function handleError(message: string): never {
   console.error(`Error: ${message}`);
   process.exit(1);

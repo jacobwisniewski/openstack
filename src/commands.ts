@@ -11,6 +11,9 @@ export interface FileSystem {
   copyFileSync: typeof fs.copyFileSync;
   readdirSync: typeof fs.readdirSync;
   rmSync: typeof fs.rmSync;
+  symlinkSync: typeof fs.symlinkSync;
+  unlinkSync: typeof fs.unlinkSync;
+  lstatSync: typeof fs.lstatSync;
 }
 
 export interface GitRunner {
@@ -264,15 +267,100 @@ export function remove(
 }
 
 export function install(
-  _paths: Paths,
-  _fs: FileSystem,
-  _git: GitRunner,
-  _source: string,
-  _options: { name?: string },
+  paths: Paths,
+  fs: FileSystem,
+  git: GitRunner,
+  source: string,
+  options: InstallOptions,
 ): InstallOutput {
-  return { success: false, error: "Not yet implemented" };
+  const config = loadConfig(paths, fs);
+  if (!config) {
+    return { success: false, error: "openstack not initialized. Run 'openstack init' first." };
+  }
+
+  // Determine profile name from source or options
+  const profileName = options.name ?? source.split("/").pop()?.replace(/\.git$/, "") ?? "unknown";
+  const profileDir = path.join(paths.profilesDir, profileName);
+
+  if (fs.existsSync(profileDir)) {
+    return { success: false, error: `Profile "${profileName}" already exists` };
+  }
+
+  // Clone the repository
+  try {
+    git.clone(source, profileDir);
+  } catch {
+    return { success: false, error: `Failed to clone from ${source}` };
+  }
+
+  // Add to config
+  config.profiles.push({
+    name: profileName,
+    source,
+    installed_at: new Date().toISOString(),
+  });
+  saveConfig(paths, fs, config);
+
+  return {
+    success: true,
+    message: `Profile "${profileName}" installed successfully from ${source}`,
+  };
 }
 
-export function use(_name: string): string {
-  return "Not yet implemented";
+export interface UseOptions {
+  name: string;
+}
+
+export interface UseResult {
+  success: true;
+  message: string;
+}
+
+export interface UseError {
+  success: false;
+  error: string;
+}
+
+export type UseOutput = UseResult | UseError;
+
+export function use(paths: Paths, fs: FileSystem, options: UseOptions): UseOutput {
+  const config = loadConfig(paths, fs);
+  if (!config) {
+    return { success: false, error: "Failed to load config" };
+  }
+
+  const profile = config.profiles.find((p) => p.name === options.name);
+  if (!profile) {
+    return { success: false, error: `Profile "${options.name}" not found` };
+  }
+
+  const profileDir = path.join(paths.profilesDir, options.name);
+  if (!fs.existsSync(profileDir)) {
+    return { success: false, error: `Profile directory for "${options.name}" not found` };
+  }
+
+  // Remove existing symlink if any
+  if (fs.existsSync(paths.opencodeDir)) {
+    const stat = fs.lstatSync(paths.opencodeDir);
+    if (stat.isSymbolicLink()) {
+      fs.unlinkSync(paths.opencodeDir);
+    } else {
+      return {
+        success: false,
+        error: `~/.config/opencode exists and is not a symlink. Please remove it manually or use 'openstack init --force' to re-initialize.`,
+      };
+    }
+  }
+
+  // Create symlink to profile
+  fs.symlinkSync(profileDir, paths.opencodeDir, "dir");
+
+  // Update config
+  config.active_profile = options.name;
+  saveConfig(paths, fs, config);
+
+  return {
+    success: true,
+    message: `Switched to profile "${options.name}"`,
+  };
 }
