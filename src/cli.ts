@@ -43,40 +43,56 @@ function loadConfig(): OpenStackConfig {
   const content = fs.readFileSync(CONFIG_FILE, "utf-8");
   // Simple YAML-like parsing for now
   const lines = content.split("\n");
-  const config: Partial<OpenStackConfig> = { profiles: [] };
+  const profiles: ProfileEntry[] = [];
+  let version = "";
+  let activeProfile = "";
   let inProfiles = false;
-  let currentProfile: Partial<ProfileEntry> = {};
+  let currentName = "";
+  let currentSource = "";
+  let currentInstalledAt = "";
 
   for (const line of lines) {
     const trimmed = line.trim();
 
     if (trimmed.startsWith("version:")) {
-      config.version = trimmed.split(":")[1].trim().replace(/"/g, "");
+      version = trimmed.split(":")[1].trim().replace(/"/g, "");
     } else if (trimmed.startsWith("active_profile:")) {
-      config.active_profile = trimmed.split(":")[1].trim().replace(/"/g, "");
+      activeProfile = trimmed.split(":")[1].trim().replace(/"/g, "");
     } else if (trimmed === "profiles:") {
       inProfiles = true;
     } else if (inProfiles && trimmed.startsWith("- name:")) {
       // Save previous profile if exists
-      if (currentProfile.name) {
-        config.profiles!.push(currentProfile as ProfileEntry);
+      if (currentName) {
+        profiles.push({
+          name: currentName,
+          source: currentSource,
+          installed_at: currentInstalledAt,
+        });
       }
-      currentProfile = {
-        name: trimmed.split(":")[1].trim().replace(/"/g, ""),
-      };
+      currentName = trimmed.split(":")[1].trim().replace(/"/g, "");
+      currentSource = "";
+      currentInstalledAt = "";
     } else if (inProfiles && trimmed.startsWith("source:")) {
-      currentProfile.source = trimmed.split(":")[1].trim().replace(/"/g, "");
+      currentSource = trimmed.split(":")[1].trim().replace(/"/g, "");
     } else if (inProfiles && trimmed.startsWith("installed_at:")) {
-      currentProfile.installed_at = trimmed.split(":").slice(1).join(":").trim().replace(/"/g, "");
+      currentInstalledAt = trimmed.split(":").slice(1).join(":").trim().replace(/"/g, "");
     }
   }
 
   // Don't forget the last profile
-  if (currentProfile.name) {
-    config.profiles!.push(currentProfile as ProfileEntry);
+  if (currentName) {
+    profiles.push({
+      name: currentName,
+      source: currentSource,
+      installed_at: currentInstalledAt,
+    });
   }
 
-  return config as OpenStackConfig;
+  return {
+    version,
+    active_profile: activeProfile,
+    profiles,
+  };
 }
 
 function saveConfig(config: OpenStackConfig): void {
@@ -185,7 +201,7 @@ program
   .command("install <source>")
   .description("Install a profile from git URL or local path")
   .option("-n, --name <name>", "Custom name for the profile")
-  .action((source, options) => {
+  .action((source, _options) => {
     requireInit();
     console.log(`Installing from: ${source}`);
     console.log("Not yet implemented");
