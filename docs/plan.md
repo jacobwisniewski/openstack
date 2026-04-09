@@ -56,11 +56,14 @@ profiles:
 #### `openstack init`
 - **Purpose**: Initialize openstack, backup current config
 - **Actions**:
-  1. Check if already initialized
+  1. **Check if already initialized**: If `~/.config/openstack/config.yaml` exists, error (already initialized)
   2. Create `~/.config/openstack/` directory structure
-  3. Backup current `~/.config/opencode/` to `profiles/default/`
-  4. Create `config.yaml` with "default" as active
-- **Errors**: Fail if opencode config doesn't exist
+  3. Backup current `~/.config/opencode/` to `profiles/default/` (copy, not symlink)
+  4. **Verify backup**: Ensure `profiles/default/AGENTS.md` exists before proceeding
+  5. Create `config.yaml` with "default" as active
+- **Errors**: 
+  - Fail if opencode config doesn't exist (no `~/.config/opencode/AGENTS.md`)
+  - Fail if already initialized ("Already initialized. Use --force to re-initialize (DANGER: will overwrite default backup)")
 
 #### `openstack install <source>`
 - **Purpose**: Install a profile from git URL
