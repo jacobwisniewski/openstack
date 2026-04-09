@@ -309,6 +309,7 @@ export function install(
 
 export interface UseOptions {
   name: string;
+  force?: boolean;
 }
 
 export interface UseResult {
@@ -339,23 +340,39 @@ export function use(paths: Paths, fs: FileSystem, options: UseOptions): UseOutpu
     return { success: false, error: `Profile directory for "${options.name}" not found` };
   }
 
-  // Remove existing symlink if any
   if (fs.existsSync(paths.opencodeDir)) {
     const stat = fs.lstatSync(paths.opencodeDir);
-    if (stat.isSymbolicLink()) {
-      fs.unlinkSync(paths.opencodeDir);
+    if (!stat.isSymbolicLink()) {
+      if (options.force) {
+        const defaultProfileDir = path.join(paths.profilesDir, "default");
+        if (!fs.existsSync(defaultProfileDir)) {
+          copyDir(fs, paths.opencodeDir, defaultProfileDir);
+
+          const hasDefault = config.profiles.some((p) => p.name === "default");
+          if (!hasDefault) {
+            config.profiles.unshift({
+              name: "default",
+              source: "local",
+              installed_at: new Date().toISOString(),
+            });
+            saveConfig(paths, fs, config);
+          }
+        }
+
+        fs.rmSync(paths.opencodeDir, { recursive: true });
+      } else {
+        return {
+          success: false,
+          error: `~/.config/opencode exists as a regular directory. Use --force to convert it to a managed profile.`,
+        };
+      }
     } else {
-      return {
-        success: false,
-        error: `~/.config/opencode exists and is not a symlink. Please remove it manually or use 'openstack init --force' to re-initialize.`,
-      };
+      fs.unlinkSync(paths.opencodeDir);
     }
   }
 
-  // Create symlink to profile
   fs.symlinkSync(profileDir, paths.opencodeDir, "dir");
 
-  // Update config
   config.active_profile = options.name;
   saveConfig(paths, fs, config);
 

@@ -79,9 +79,10 @@ program
 program
   .command("use <name>")
   .description("Switch to a profile")
-  .action((name) => {
+  .option("-f, --force", "Auto-convert existing opencode config without prompting")
+  .action((name, options) => {
     const paths = createPaths();
-    const result = use(paths, fileSystem, { name });
+    const result = use(paths, fileSystem, { name, force: options.force });
 
     if (!result.success) {
       handleError(result.error);
